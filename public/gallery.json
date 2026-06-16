@@ -1,0 +1,20 @@
+[
+  {
+    "Id": "gal-1",
+    "Type": "photo",
+    "Image": "images/gallery/siege-1.png",
+    "VideoUrl": "",
+    "CaptionEs": "Foto del siege",
+    "CaptionEn": "Siege photo",
+    "Active": true
+  },
+  {
+    "Id": "gal-2",
+    "Type": "video",
+    "Image": "",
+    "VideoUrl": "https://www.youtube.com/watch?v=GXzElCjhsMo",
+    "CaptionEs": "Video de guerra",
+    "CaptionEn": "War video",
+    "Active": true
+  }
+]

@@ -3,11 +3,10 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "npm run start:env",
+    "start": "node server.mjs",
     "dev": "ng serve",
-    "start:env": "npm run build && node --env-file=.env server.mjs",
-    "serve:env": "node --env-file=.env server.mjs",
     "build": "ng build",
+    "serve:local": "npm run build && node server.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },

@@ -1,35 +1,7 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, ElementRef, ViewChild, inject } from '@angular/core';
 
-type GuildRole = 'Leader' | 'Assistant' | 'Battle Master' | 'Member';
-
-type GuildMember = {
-  nick: string;
-  characterClass: string;
-  rank: string;
-  level: string;
-  masterLevel: string;
-  guildRole: GuildRole;
-  status: string;
-  image: string;
-  quote: string;
-};
-
-type GuildPayload = {
-  members: GuildMember[];
-  gallery?: GalleryItem[];
-};
-
-type GalleryItem = {
-  id: string;
-  type: 'photo' | 'video';
-  src: string;
-  videoUrl: string;
-  caption: {
-    es: string;
-    en: string;
-  };
-};
+import { GuildDataService } from './guild-data.service';
+import { GalleryItem, GuildMember, GuildPayload, GuildRole } from './guild.model';
 
 type CharacterPreview = {
   name: string;
@@ -63,6 +35,19 @@ const YEAR_FROM = '2019';
 const YEAR_TO = '2024';
 const BROWSER_TITLE = 'AllStar';
 const FOOTER_APPEND_TEXT = 'Developed by Fukala.';
+
+// ============================================================
+//  DISCORD
+//  Pega aqui el enlace de invitacion de tu servidor de Discord.
+//  - Si lo dejas vacio (''), el boton "Unete" se oculta por completo.
+//  - Si pones un enlace, el boton "Unete" se convierte en un boton
+//    "Discord" que abre esa invitacion en una pestana nueva.
+//  Ejemplo: const DISCORD_URL = 'https://discord.gg/tuCodigo';
+// ============================================================
+const DISCORD_URL = '';
+const DISCORD_LABEL = 'Discord';
+// Textos del boton original que serán reemplazados/ocultados.
+const JOIN_LABELS = ['únete', 'unete', 'súmate', 'sumate', 'join'];
 const RESPONSIVE_CSS = `
 html,
 body,
@@ -776,10 +761,9 @@ footer [style*="grid-template-columns"] {
 export class App {
   @ViewChild('allstarFrame') private readonly frame?: ElementRef<HTMLIFrameElement>;
 
-  private readonly http = inject(HttpClient);
+  private readonly guildData = inject(GuildDataService);
   private lastPayload: GuildPayload | null = null;
   private isLoadingGuild = false;
-  private apiBase = '';
   private rosterImages = new Map<string, string>();
   private leaderPreviews = new Map<string, CharacterPreview>();
 
@@ -797,39 +781,18 @@ export class App {
   private loadGuild(): void {
     this.isLoadingGuild = true;
 
-    this.http.get<GuildPayload>('/api/guild').subscribe({
-      next: (payload) => {
-        if (this.isValidPayload(payload)) {
-          this.setPayload(payload, '');
-          return;
-        }
-
-        this.loadGuildFromBackendFallback();
-      },
-      error: () => this.loadGuildFromBackendFallback(),
-    });
-  }
-
-  private loadGuildFromBackendFallback(): void {
-    const backendBase = 'http://localhost:4000';
-
-    this.http.get<GuildPayload>(`${backendBase}/api/guild`).subscribe({
-      next: (payload) => this.setPayload(payload, backendBase),
-      error: (_error: HttpErrorResponse) => {
+    this.guildData.load().subscribe({
+      next: (payload) => this.setPayload(payload),
+      error: () => {
         this.isLoadingGuild = false;
       },
     });
   }
 
-  private setPayload(payload: GuildPayload, apiBase: string): void {
+  private setPayload(payload: GuildPayload): void {
     this.lastPayload = payload;
-    this.apiBase = apiBase;
     this.isLoadingGuild = false;
     this.renderFrame();
-  }
-
-  private isValidPayload(payload: GuildPayload): boolean {
-    return Array.isArray(payload?.members);
   }
 
   private renderFrame(attempt = 0): void {
@@ -902,6 +865,7 @@ export class App {
     this.syncLeaderInteractions(win);
     this.replaceRenderedYear(doc, YEAR_FROM, YEAR_TO);
     this.syncFooterAppendix(win);
+    this.syncJoinDiscord(win);
   }
 
   private isAllStarReady(win: FrameWindow): boolean {
@@ -1322,10 +1286,30 @@ export class App {
     const nextItems = navLinks.map((link) => ({
       href: link.getAttribute('href') || '#top',
       text: link.textContent?.trim() || (link.getAttribute('href') || '#top').replace('#', ''),
+      external: false,
     }));
-    const menuItems = nextItems.length
+    const baseItems = nextItems.length
       ? nextItems
-      : fallbackLinks.map(([href, text]) => ({ href, text }));
+      : fallbackLinks.map(([href, text]) => ({ href, text, external: false }));
+
+    // Transforma el item "Únete": lo convierte en Discord o lo omite.
+    const menuItems = baseItems
+      .map((item) => {
+        const isJoin =
+          item.href === '#join' || JOIN_LABELS.some((label) => item.text.toLowerCase().includes(label));
+
+        if (!isJoin) {
+          return item;
+        }
+
+        if (!DISCORD_URL) {
+          return null;
+        }
+
+        return { href: DISCORD_URL, text: DISCORD_LABEL, external: true };
+      })
+      .filter((item): item is { href: string; text: string; external: boolean } => item !== null);
+
     const currentSignature = Array.from(panel.querySelectorAll<HTMLAnchorElement>('a'))
       .map((link) => `${link.getAttribute('href')}|${link.textContent}`)
       .join('::');
@@ -1337,6 +1321,10 @@ export class App {
         const item = doc.createElement('a');
         item.href = link.href;
         item.textContent = link.text;
+        if (link.external) {
+          item.target = '_blank';
+          item.rel = 'noopener noreferrer';
+        }
         item.addEventListener('click', () => {
           panel?.classList.remove('is-open');
           toggle?.setAttribute('aria-expanded', 'false');
@@ -1658,6 +1646,113 @@ export class App {
     }
   }
 
+  /**
+   * Maneja el boton "Únete" del diseño:
+   *  - Si DISCORD_URL esta vacio, oculta el boton (lo omitimos).
+   *  - Si hay un enlace, convierte el boton "Únete" en un boton "Discord"
+   *    funcional que abre la invitacion en una pestana nueva.
+   * Tambien activa cualquier elemento que ya diga "Discord".
+   */
+  private syncJoinDiscord(win: FrameWindow): void {
+    const doc = win.document;
+
+    const apply = () => {
+      const candidates = Array.from(doc.querySelectorAll<HTMLElement>('a, button'));
+
+      for (const element of candidates) {
+        // El menu movil se maneja en syncMobileNavigation para evitar bucles.
+        if (element.closest('#as-mobile-menu-panel')) {
+          continue;
+        }
+
+        const text = (element.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+        if (!text) {
+          continue;
+        }
+
+        const isJoin = JOIN_LABELS.some((label) => text.includes(label));
+        const isDiscord = text === DISCORD_LABEL.toLowerCase();
+
+        if (!isJoin && !isDiscord) {
+          continue;
+        }
+
+        if (!DISCORD_URL) {
+          if (isJoin) {
+            element.style.display = 'none';
+          }
+          continue;
+        }
+
+        if (isJoin) {
+          this.setElementLabel(element, DISCORD_LABEL);
+        }
+
+        this.bindDiscord(element, DISCORD_URL, win);
+      }
+    };
+
+    apply();
+    [0, 50, 200, 600, 1200].forEach((delay) => win.setTimeout(apply, delay));
+
+    if (win.MutationObserver) {
+      const observer = new win.MutationObserver(apply);
+      observer.observe(doc.body, {
+        childList: true,
+        subtree: true,
+      });
+    }
+  }
+
+  /** Reemplaza el texto visible del boton (respetando posibles iconos hijos). */
+  private setElementLabel(element: HTMLElement, label: string): void {
+    let replaced = false;
+
+    const walk = (node: Node) => {
+      for (const child of Array.from(node.childNodes)) {
+        if (child.nodeType === 3) {
+          const value = (child.nodeValue || '').trim();
+          if (value && JOIN_LABELS.some((join) => value.toLowerCase().includes(join))) {
+            child.nodeValue = label;
+            replaced = true;
+          }
+        } else {
+          walk(child);
+        }
+      }
+    };
+
+    walk(element);
+
+    if (!replaced && element.childElementCount === 0) {
+      element.textContent = label;
+    }
+  }
+
+  /** Hace que un elemento abra el enlace de Discord en una pestana nueva. */
+  private bindDiscord(element: HTMLElement, url: string, win: FrameWindow): void {
+    if (element.dataset['discordBound']) {
+      return;
+    }
+
+    element.dataset['discordBound'] = 'true';
+    element.style.display = '';
+
+    if (element.tagName === 'A') {
+      const anchor = element as HTMLAnchorElement;
+      anchor.href = url;
+      anchor.target = '_blank';
+      anchor.rel = 'noopener noreferrer';
+    }
+
+    element.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      win.open(url, '_blank', 'noopener,noreferrer');
+    });
+  }
+
   private bindLeaderModal(element: HTMLElement, modal: HTMLElement, preview: CharacterPreview): void {
     if (element.dataset['leaderModalBound']) {
       return;
@@ -1751,15 +1846,7 @@ export class App {
   }
 
   private imageUrl(value: string): string {
-    if (!value) {
-      return '';
-    }
-
-    if (value.startsWith('/api/') && this.apiBase) {
-      return `${this.apiBase}${value}`;
-    }
-
-    return value;
+    return value || '';
   }
 
   private rankTone(role: GuildRole, index: number): string {

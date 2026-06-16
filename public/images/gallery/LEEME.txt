@@ -1,0 +1,34 @@
+IMÁGENES DE LA GALERÍA
+======================
+
+Coloca aquí las fotos de la galería.
+
+Cómo se vinculan:
+- En public/gallery.json, para los items de tipo "photo", el campo "Image"
+  debe apuntar a un archivo de esta carpeta.
+
+  Ejemplo (foto):
+    {
+      "Id": "gal-1",
+      "Type": "photo",
+      "Image": "images/gallery/siege-1.jpg",
+      ...
+    }
+  => debe existir: public/images/gallery/siege-1.jpg
+
+Videos de YouTube:
+- Para items de tipo "video", deja "Image": "" y pon el link de YouTube en
+  "VideoUrl". La miniatura se obtiene automáticamente de YouTube (no usa API).
+
+  Ejemplo (video):
+    {
+      "Id": "gal-2",
+      "Type": "video",
+      "Image": "",
+      "VideoUrl": "https://www.youtube.com/watch?v=XXXXXXXX",
+      ...
+    }
+
+Recomendaciones:
+- Nombres en minúsculas, sin espacios ni acentos.
+- Formatos: .png, .jpg o .webp.

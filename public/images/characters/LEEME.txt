@@ -1,0 +1,20 @@
+IMÁGENES DE PERSONAJES (líderes / miembros)
+============================================
+
+Coloca aquí las fotos de los personajes que quieras mostrar.
+
+Cómo se vinculan:
+- En public/character.json, el campo "Image" de cada personaje debe apuntar
+  a un archivo de esta carpeta, usando la ruta relativa desde public/.
+
+  Ejemplo:
+    "Image": "images/characters/fakeelf.png"
+  => debe existir el archivo: public/images/characters/fakeelf.png
+
+Recomendaciones:
+- Usa nombres en minúsculas, sin espacios ni acentos (ej. fakeelf.png).
+- Formatos: .png, .jpg o .webp.
+- Tamaño sugerido: cuadrado (ej. 512x512 o 600x600).
+- Si un personaje no tiene imagen, deja "Image": "" y se mostrarán sus iniciales.
+
+Las imágenes son archivos locales: NO se usa Google Drive ni ninguna API.
