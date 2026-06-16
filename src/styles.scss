@@ -1,0 +1,19 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #09070d;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
