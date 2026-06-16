@@ -230,6 +230,11 @@ footer [style*="grid-template-columns"] {
   aspect-ratio: 3 / 4;
 }
 
+/* Nombre del líder inyectado: oculto en desktop (el diseño ya lo muestra). */
+.as-leader-mobile-name {
+  display: none;
+}
+
 [style*="width: 100vw"],
 [style*="min-width: 100vw"] {
   width: 100% !important;
@@ -683,6 +688,19 @@ footer [style*="grid-template-columns"] {
     object-position: center top !important;
   }
 
+  #leaders .as-leader-mobile-name {
+    display: block !important;
+    margin: -8px 0 14px;
+    text-align: center;
+    color: var(--gold-300);
+    font-family: var(--font-wordmark, var(--font-label));
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  }
+
   header#top h1,
   section h2,
   section h3 {
@@ -1114,7 +1132,34 @@ export class App {
 
           this.bindLeaderModal(portrait, modal, preview);
         }
+
+        this.ensureLeaderName(card, preview.name, nativePortrait ?? portrait);
       });
+  }
+
+  /**
+   * Inserta el nombre del líder visible en la tarjeta (solo se ve en mobile vía
+   * CSS). Asi el nombre se muestra al hacer scroll, sin depender del hover ni
+   * del click que abre el modal.
+   */
+  private ensureLeaderName(card: HTMLElement, name: string, anchor: HTMLElement | null): void {
+    const doc = card.ownerDocument;
+    let label = card.querySelector<HTMLElement>('.as-leader-mobile-name');
+
+    if (!label) {
+      label = doc.createElement('div');
+      label.className = 'as-leader-mobile-name';
+
+      if (anchor && anchor.parentElement === card) {
+        anchor.insertAdjacentElement('afterend', label);
+      } else {
+        card.insertBefore(label, card.firstChild);
+      }
+    }
+
+    if (label.textContent !== name) {
+      label.textContent = name;
+    }
   }
 
   private findLeaderCards(section: HTMLElement, previews: CharacterPreview[]): HTMLElement[] {
