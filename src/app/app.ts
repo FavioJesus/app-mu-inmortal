@@ -46,8 +46,19 @@ const FOOTER_APPEND_TEXT = 'Developed by Fukala.';
 // ============================================================
 const DISCORD_URL = '';
 const DISCORD_LABEL = 'Discord';
-// Textos del boton original que serán reemplazados/ocultados.
-const JOIN_LABELS = ['únete', 'unete', 'súmate', 'sumate', 'join'];
+// Textos de botones "unirse" que serán reemplazados por Discord (u ocultados).
+const JOIN_LABELS = [
+  'únete',
+  'unete',
+  'súmate',
+  'sumate',
+  'join',
+  'solicitar ingreso',
+  'solicitar',
+  'aplicar',
+  'postular',
+  'apply',
+];
 const RESPONSIVE_CSS = `
 html,
 body,
