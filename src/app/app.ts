@@ -26,6 +26,7 @@ type FrameWindow = Window & {
   __allstarDynamicRoot?: any;
   __allstarMenuBound?: boolean;
   __allstarLeaderModalBound?: boolean;
+  __allstarGmtAutoset?: boolean;
 };
 
 const LEADERSHIP_ROLES = new Set(['leader', 'assistant', 'battle master']);
@@ -877,6 +878,7 @@ export class App {
     this.replaceRenderedYear(doc, YEAR_FROM, YEAR_TO);
     this.syncFooterAppendix(win);
     this.syncJoinDiscord(win);
+    this.syncScheduleTimezone(win);
   }
 
   private isAllStarReady(win: FrameWindow): boolean {
@@ -1714,6 +1716,104 @@ export class App {
         subtree: true,
       });
     }
+  }
+
+  /**
+   * Detecta la zona horaria del visitante (sin APIs ni permisos) y selecciona
+   * automaticamente la opcion correspondiente en el selector de GMT del diseño.
+   * Compara el offset numerico (GMT-5, UTC+1, (GMT-05:00) Lima, etc.), asi que
+   * funciona sin importar la etiqueta exacta. Solo se ejecuta una vez para no
+   * pisar la eleccion manual del usuario.
+   */
+  private syncScheduleTimezone(win: FrameWindow): void {
+    if (win.__allstarGmtAutoset) {
+      return;
+    }
+
+    const doc = win.document;
+    const visitorOffset = -new Date().getTimezoneOffset() / 60; // horas, ej. -5
+
+    const trySelect = (): boolean => {
+      if (win.__allstarGmtAutoset) {
+        return true;
+      }
+
+      const select = Array.from(doc.querySelectorAll<HTMLSelectElement>('select')).find((element) =>
+        Array.from(element.options).some(
+          (option) => this.parseGmtOffset(`${option.textContent} ${option.value}`) !== null,
+        ),
+      );
+
+      if (!select) {
+        return false;
+      }
+
+      let best: HTMLOptionElement | null = null;
+      let bestDiff = Infinity;
+
+      for (const option of Array.from(select.options)) {
+        const offset = this.parseGmtOffset(`${option.textContent} ${option.value}`);
+        if (offset === null) {
+          continue;
+        }
+
+        const diff = Math.abs(offset - visitorOffset);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          best = option;
+        }
+      }
+
+      if (!best || select.value === best.value) {
+        win.__allstarGmtAutoset = Boolean(best);
+        return Boolean(best);
+      }
+
+      // Usamos el setter nativo para que React detecte el cambio de valor.
+      const frame = win as unknown as {
+        HTMLSelectElement: typeof HTMLSelectElement;
+        Event: typeof Event;
+      };
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        frame.HTMLSelectElement.prototype,
+        'value',
+      )?.set;
+      nativeSetter?.call(select, best.value);
+      select.dispatchEvent(new frame.Event('change', { bubbles: true }));
+
+      win.__allstarGmtAutoset = true;
+      return true;
+    };
+
+    if (trySelect()) {
+      return;
+    }
+
+    [0, 50, 200, 600, 1200, 2000].forEach((delay) => win.setTimeout(trySelect, delay));
+
+    if (win.MutationObserver) {
+      const observer = new win.MutationObserver(() => {
+        if (trySelect()) {
+          observer.disconnect();
+        }
+      });
+      observer.observe(doc.body, { childList: true, subtree: true });
+    }
+  }
+
+  /** Extrae el offset horario de un texto tipo "GMT-5", "UTC+1", "(GMT-05:00) Lima". */
+  private parseGmtOffset(text: string): number | null {
+    const match = text.match(/(?:gmt|utc)\s*([+-])\s*(\d{1,2})(?::(\d{2}))?/i);
+
+    if (!match) {
+      return null;
+    }
+
+    const sign = match[1] === '-' ? -1 : 1;
+    const hours = Number.parseInt(match[2], 10);
+    const minutes = match[3] ? Number.parseInt(match[3], 10) : 0;
+
+    return sign * (hours + minutes / 60);
   }
 
   /** Reemplaza el texto visible del boton (respetando posibles iconos hijos). */
