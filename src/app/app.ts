@@ -60,6 +60,22 @@ const JOIN_LABELS = [
   'postular',
   'apply',
 ];
+
+// ============================================================
+//  TEXTOS PERSONALIZADOS
+//  Cambia frases del diseño sin tocar el bundle (que no es HTML editable).
+//  Por cada entrada:
+//   - marker: una parte (en INGLES) del texto original a buscar.
+//   - es / en: el nuevo texto en español e inglés.
+//  Para cambiar otro texto, agrega otra entrada a esta lista.
+// ============================================================
+const TEXT_OVERRIDES: { marker: string; es: string; en: string }[] = [
+  {
+    marker: 'where —so far— we are the best guild on the server, or one of the best',
+    es: 'Somos unidos.',
+    en: 'We are united.',
+  },
+];
 const RESPONSIVE_CSS = `
 html,
 body,
@@ -859,6 +875,7 @@ export class App {
     }
 
     this.replaceYearInValue(data, YEAR_FROM, YEAR_TO);
+    this.applyTextOverrides(data);
     data.guild.memberCount = this.lastPayload?.members?.length || data.guild.memberCount;
 
     const oldRoot = doc.getElementById('root');
@@ -1576,6 +1593,52 @@ export class App {
         childList: true,
         subtree: true,
       });
+    }
+  }
+
+  /**
+   * Reemplaza frases del diseño recorriendo el objeto de datos (AS_DATA).
+   * Los textos se guardan como pares {es, en}; al detectar el marcador en la
+   * version inglesa, reemplaza AMBOS idiomas de una. Asi no hay que editar el
+   * bundle. Configurable desde la constante TEXT_OVERRIDES.
+   */
+  private applyTextOverrides(value: unknown): void {
+    if (!value || typeof value !== 'object') {
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach((item) => this.applyTextOverrides(item));
+      return;
+    }
+
+    const obj = value as Record<string, unknown>;
+    const findMatch = (text: string) =>
+      TEXT_OVERRIDES.find((override) => text.toLowerCase().includes(override.marker.toLowerCase()));
+
+    // Caso principal: par bilingüe { es, en }.
+    if (typeof obj['en'] === 'string') {
+      const match = findMatch(obj['en'] as string);
+      if (match) {
+        obj['en'] = match.en;
+        if (typeof obj['es'] === 'string') {
+          obj['es'] = match.es;
+        }
+      }
+    }
+
+    // Cadenas sueltas y recursión en lo demás.
+    for (const [key, entry] of Object.entries(obj)) {
+      if (typeof entry === 'string') {
+        if (key !== 'es' && key !== 'en') {
+          const match = findMatch(entry);
+          if (match) {
+            obj[key] = match.en;
+          }
+        }
+      } else {
+        this.applyTextOverrides(entry);
+      }
     }
   }
 
