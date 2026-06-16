@@ -65,16 +65,19 @@ const JOIN_LABELS = [
 //  TEXTOS PERSONALIZADOS
 //  Cambia frases del diseño sin tocar el bundle (que no es HTML editable).
 //  Por cada entrada:
-//   - marker: una parte (en INGLES) del texto original a buscar.
-//   - es / en: el nuevo texto en español e inglés.
-//  Para cambiar otro texto, agrega otra entrada a esta lista.
+//   - from: la frase EXACTA del texto original (tal cual aparece).
+//   - to:   el nuevo texto.
+//  Reemplaza SOLO esa frase dentro del párrafo (no borra el resto) y no
+//  distingue mayúsculas. Para cambiar otro texto, agrega otra entrada.
+//  Para que aplique en español, pega también la frase original en español.
 // ============================================================
-const TEXT_OVERRIDES: { marker: string; es: string; en: string }[] = [
+const TEXT_OVERRIDES: { from: string; to: string }[] = [
   {
-    marker: 'where —so far— we are the best guild on the server, or one of the best',
-    es: 'Somos unidos.',
-    en: 'We are united.',
+    from: 'where —so far— we are the best guild on the server, or one of the best.',
+    to: 'we are united.',
   },
+  // Cuando me pases la frase original en español, se agrega así:
+  // { from: 'donde —por ahora— somos la mejor guild del servidor, o una de las mejores.', to: 'somos unidos.' },
 ];
 const RESPONSIVE_CSS = `
 html,
@@ -1598,9 +1601,8 @@ export class App {
 
   /**
    * Reemplaza frases del diseño recorriendo el objeto de datos (AS_DATA).
-   * Los textos se guardan como pares {es, en}; al detectar el marcador en la
-   * version inglesa, reemplaza AMBOS idiomas de una. Asi no hay que editar el
-   * bundle. Configurable desde la constante TEXT_OVERRIDES.
+   * Solo sustituye la frase exacta (TEXT_OVERRIDES.from) dentro de cada texto,
+   * conservando el resto del párrafo. No distingue mayúsculas.
    */
   private applyTextOverrides(value: unknown): void {
     if (!value || typeof value !== 'object') {
@@ -1613,33 +1615,26 @@ export class App {
     }
 
     const obj = value as Record<string, unknown>;
-    const findMatch = (text: string) =>
-      TEXT_OVERRIDES.find((override) => text.toLowerCase().includes(override.marker.toLowerCase()));
 
-    // Caso principal: par bilingüe { es, en }.
-    if (typeof obj['en'] === 'string') {
-      const match = findMatch(obj['en'] as string);
-      if (match) {
-        obj['en'] = match.en;
-        if (typeof obj['es'] === 'string') {
-          obj['es'] = match.es;
-        }
-      }
-    }
-
-    // Cadenas sueltas y recursión en lo demás.
     for (const [key, entry] of Object.entries(obj)) {
       if (typeof entry === 'string') {
-        if (key !== 'es' && key !== 'en') {
-          const match = findMatch(entry);
-          if (match) {
-            obj[key] = match.en;
-          }
-        }
+        obj[key] = this.overrideText(entry);
       } else {
         this.applyTextOverrides(entry);
       }
     }
+  }
+
+  /** Aplica los reemplazos de TEXT_OVERRIDES a una cadena (frase por frase). */
+  private overrideText(text: string): string {
+    let result = text;
+
+    for (const override of TEXT_OVERRIDES) {
+      const pattern = override.from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      result = result.replace(new RegExp(pattern, 'gi'), override.to);
+    }
+
+    return result;
   }
 
   private replaceYearInValue(value: unknown, from: string, to: string): void {
